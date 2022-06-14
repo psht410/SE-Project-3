@@ -98,9 +98,26 @@ select {
   filter: blur(10px);
 }
 
-.img_thumb {
-  max-height: 10rem;
-  object-fit: cover;
+@media screen and (min-width:1440px) and (max-width: 2560px){
+  .img_thumb {
+    max-height: 20rem;
+    object-fit: cover;
+  }
+}
+
+@media screen and (min-width:1024px) and (max-width: 1440px){
+  .img_thumb {
+    max-height: 15rem;
+    object-fit: cover;
+  }
+}
+
+
+@media screen and (max-width: 1024px){
+  .img_thumb {
+    max-height: 10rem;
+    object-fit: cover;
+  }
 }
 
 .tiny-text {
