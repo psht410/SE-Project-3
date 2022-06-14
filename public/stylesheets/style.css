@@ -4,7 +4,7 @@
 
 body {
   padding: 5%;
-  /*font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;*/
+  font: 1rem "Lucida Grande", Helvetica, Arial, sans-serif;
   background-color: #E57373;
   width: 100% !important;
 }
@@ -23,10 +23,6 @@ select {
 
  .modal {
    width: 70%;
- }
-
- #rfid {
-   height: 50%;
  }
 
  .container {

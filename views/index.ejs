@@ -921,8 +921,16 @@
                                 <div class="collapsible-header deep-orange lighten-5">
                                     <h5><i class="material-icons">phone_iphone</i>문의</h5>
                                 </div>
-                                <div class="collapsible-body left-align">
-                                    <h4 class="center-align">{{readItem.phone | phoneExp}}</h4>
+                                <div class="collapsible-body center-align">
+                                    <div class="chip adjust-text teal lighten-5">
+                                        <img ng-src="upload-images/{{name}}/pfp" ng-repeat="name in readItem" repeat-end="onEnd(true)" ng-if="name == readItem.username">
+                                        {{readItem.username}}
+                                    </div>
+                                    <div class="chip adjust-text  teal lighten-5">
+                                        <img src="images/phone.png">
+                                        {{readItem.phone | phoneExp }}
+                                    </div>
+                                    <!-- <h4 class="center-align">{{readItem.phone | phoneExp}}</h4> -->
                                 </div>
                             </li>
 
