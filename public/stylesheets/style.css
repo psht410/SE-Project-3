@@ -1,0 +1,112 @@
+@use "@material/fab";
+
+@include fab.core-styles;
+
+body {
+  padding: 5%;
+  /*font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;*/
+  background-color: #E57373;
+  width: 100% !important;
+}
+
+nav .brand-logo {
+  /* position: fixed; */
+}
+
+.btn {
+  margin:5%;
+}
+
+select {
+   display: block;
+ }
+
+ .modal {
+   width: 70%;
+ }
+
+ #rfid {
+   height: 50%;
+ }
+
+ .container {
+   /* max-width: 70%; */
+ }
+
+ #logo {
+   width: 13%;
+ }
+
+ .btn-large {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+ }
+
+ #upload_file_icon {
+   margin: 0;
+ }
+
+ .item_title {
+   font-weight: 500 !important;
+   /* margin-top: 1em; */
+   /* margin-left: 1em; */
+ }
+ 
+ .opacity {
+   opacity: .3;
+ }
+
+ .card-title, .card-action {
+   padding: .5rem !important;
+ }
+
+ .card-content {
+   padding: .7rem !important;
+   margin-bottom: .5rem;
+ }
+ 
+ .card-panel {
+   padding: 1rem;
+ }
+
+ .carousel {
+   height: 40rem !important;
+   /* perspective: 950px; */
+   /* transform: translateY(+20%); */
+ }
+
+ .carousel .carousel-item{
+  width: 50%;
+  height: 100%;
+ }
+
+ #nomg {
+   padding-left: 0;
+   padding-right: 0;
+   padding-top: 0;
+ }
+
+ .carousel .indicators .indicator-item {
+   background-color: #ef9a9a;
+ }
+
+ .carousel .indicators .indicator-item.active {
+  background-color: #ef5350;
+}
+
+.overlay_blur {
+  filter: blur(10px);
+}
+
+.img_thumb {
+  max-height: 10rem;
+  object-fit: cover;
+}
+
+.tiny-text {
+  font-size: 0.8rem !important;
+}
+
+.adjust-text {
+  font-size: 1.5em;
+}

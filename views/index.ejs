@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>책</title>
+
+    <!--Let browser know website is optimized for mobile-->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+    <!--Google Icon Font-->
+    <link href="http://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!--Materialize CSS-->
+    <link type="text/css" rel="stylesheet" href="stylesheets/materialize.min.css"  media="screen,projection"/>
+    <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"> -->
+
+
+    <!--Custom CSS-->
+    <link rel='stylesheet' href='/stylesheets/style.css' />
+
+    <!-- AngularJS -->
+    <script src="//ajax.googleapis.com/ajax/libs/angularjs/1.4.8/angular.min.js"></script>
+
+    <link rel="stylesheet" href="//unpkg.com/ng-table@2.0.2/bundles/ng-table.min.css">
+    <script src="//unpkg.com/ng-table@2.0.2/bundles/ng-table.min.js"></script>
+</head>
+
+<script>
+    var data = <%- JSON.stringify(item) %>;
+    var user = "<%= username %>";
+    var is_logined = "<%= is_logined %>";
+
+    "use strict";
+
+    var itemcards = angular.module("ItemCards", []);
+    itemcards.controller("ItemCardsCtrl", function($scope, $http){
+        $scope.items = data;
+        $scope.logined_user = user;
+        $scope.is_logined = is_logined;
+        $scope.tabFilterType = "";
+        $scope.tabFilterOrderProp = '-regdate';
+        $scope.tabFilterOrderType = false;
+
+        $scope.tabFilterChange = function(filter){
+            $scope.tabFilterType = filter;
+        }
+
+        $scope.tabFilterChangeOrder = function(filter){
+            $scope.tabFilterOrderType = !$scope.tabFilterOrderType;
+            if($scope.tabFilterOrderProp != filter){
+                $scope.tabFilterOrderType = false;
+                $scope.tabFilterOrderProp = filter;
+            }
+        }
+
+        $scope.getItemData = function(itemId){
+            if(!is_logined)
+                M.TapTarget.getInstance($('.tap-target')).open();
+            else {
+                $http({
+                    method: 'GET',
+                    url: '/read/' + itemId
+                }).then(function ifOK(res){
+                    $scope.readItem = res.data;
+                    M.Modal.getInstance($('#read')).open(); 
+
+                }, function ifErr(res){
+                    console.log("err : " + res);
+                });
+            }
+        };
+        
+        $scope.onEnd = function(isMultiple){
+            $('.indicators').remove();
+            $('.carousel').carousel({
+                duration: 50,
+                dist: -100,
+                // shift: 300,
+                padding: 500,
+                fullWidth: false,
+                indicators: isMultiple,
+                numVisible: 3
+            });
+            $('.collapsible').collapsible({
+                accordion: false
+            });
+        };
+
+        $scope.itemDelete = function(itemId){
+            var isOK = confirm("진짜 지워요 ?");
+
+            if(isOK){
+                $http({
+                    method: 'GET',
+                    url: '/delete/' + itemId
+                }).then(function ifOK(res){
+                    if(res)
+                        location.replace('/');
+
+                }, function ifErr(res){
+                    console.log("err : " + res);
+                });
+            }    
+        };
+
+        $scope.btnItemUpdate = function(item){
+            M.Modal.getInstance($('#update')).open(); 
+
+            $('#update input, #update textarea').each(function(){this.focus();});
+            $('.chips-initial').chips({
+                data: item.tag
+            });
+            $('#update_status').prop('checked', item.status);
+        };
+
+        $scope.itemUpdate = function(item){
+            var data_tag = M.Chips.getInstance($('#update_tag')).chipsData;
+            var data_status = $('#update_status').prop('checked');
+            
+            var formData = new FormData($('#form_update')[0]);
+            formData.append('_id', item._id);
+            formData.append('tag', JSON.stringify(data_tag));
+            formData.append('status', data_status);
+
+            $.ajax({
+                type: "POST",
+                processData: false,
+                contentType: false,
+                dataType: "JSON",
+                enctype: 'multipart/form-data',
+                url: '/update',
+                data : formData,
+                success: function(res){
+                    console.log(res);
+                    location.replace('/');
+                },
+                error: function(req, status, err){
+                    M.toast({html: '매물 수정 오류, 로그 확인'});
+                    console.log(err);
+                }
+            });
+        }
+
+        $scope.btnItemBuy = function(itemId){
+            var isOK = confirm("진짜 삽니다 ?");
+
+            if(isOK){
+                $http({
+                    method: 'GET',
+                    url: '/buy/' + itemId
+                }).then(function ifOK(res){
+                    if(res)
+                        location.replace('/');
+                    else
+                        M.toast({html: "구매 실패"});
+
+                }, function ifErr(res){
+                    console.log("err : " + res);
+                });
+            }    
+        }
+
+        $scope.itemBuy = function(itemId, confirm){
+            var reqData = {
+                oid : itemId,
+                confirm: confirm
+            };
+
+            $.ajax({
+                type: "POST",
+                dataType: "JSON",
+                url: '/buy',
+                data : reqData,
+                success: function(res){
+                    console.log(res);
+                    location.replace('/');
+                },
+                error: function(req, status, err){
+                    M.toast({html: '판매 처리 오류, 로그 확인'});
+                    console.log(err);
+                }
+            });
+        }
+
+        $scope.itemLike = function(itemId){
+            if(!is_logined)
+                M.TapTarget.getInstance($('.tap-target')).open();
+            else{
+                var a_tag = $('#lk_'+itemId);
+                var a_class = a_tag.attr('class');
+                var a_val = a_tag.attr('value');
+                var lc_tag = $('#lc_'+itemId);
+                
+                if(JSON.parse(a_val)){
+                    // is favor-ed
+                    a_tag.attr('class', a_class.replace('red', 'grey'));
+                    a_tag.attr('value', a_val.replace('true', 'false'));
+                    lc_tag.text(Number(lc_tag.text()) - 1);
+                }else{
+                    // is not favor-ed
+                    a_tag.attr('class', a_class.replace('grey', 'red'));
+                    a_tag.attr('value', a_val.replace('false', 'true'));
+                    lc_tag.text(Number(lc_tag.text()) + 1);
+                }
+                        
+                $http({
+                        method: 'GET',
+                        url: '/like/' + itemId + '/' + a_val
+                    }).then(function ifOK(res){
+                        if(res){
+
+                        }else{
+
+                        }
+
+                    }, function ifErr(res){
+                        console.log("err : " + res);
+                    });
+            }
+        }
+    });
+
+    itemcards.directive("repeatEnd", function(){
+        return {
+            restrict: "A",
+            link: function(scope, element, attrs){
+                if(scope.$last){
+                    scope.$eval(attrs.repeatEnd);
+                }
+            }
+        }
+    });
+
+    itemcards.directive("imgCheck", ['$http', function($http){
+        return {
+            link: function(scope, element, attrs){
+                $http.get('upload-images/'+attrs.imgCheck+'/pfp')
+                    .success(function(data, status){
+                        if(status==200 || status==304)
+                            attrs.$set('src', 'upload-images/'+attrs.imgCheck+'/pfp');
+                        else
+                            attrs.$set('src', 'images/account_circle.png');
+                    })
+                    .error(function(data, status){
+                        if(status==200 || status==304)
+                            attrs.$set('src', 'upload-images/'+attrs.imgCheck+'/pfp');
+                        else
+                            attrs.$set('src', 'images/account_circle.png');
+                    });
+            }
+        }
+    }]);
+
+    itemcards.filter('newlines', function(){
+        return function(text) {
+            return (text||'').split(/\r\n/g);
+        }
+    });
+
+    itemcards.filter('phoneExp', function(){
+        return function(number) {
+            var tmp = String(number);
+
+            var hp = '0' + tmp.slice(0, 2) + '-' + tmp.slice(2, 6) + '-' + tmp.slice(6);
+
+            return hp;
+        }
+    });
+
+    itemcards.filter('imgPathExp', function(){
+        return function(path) {
+            if(path)
+                return path.substr(7);
+            else
+                return 'images/logo.png';
+        }
+    });
+
+    itemcards.filter("tabFilter", function($filter){
+        return function(items, scope) {
+            if(scope.tabFilterType){
+                var res = [];
+                angular.forEach(items, function(item){
+                    switch (scope.tabFilterType) {
+                        case 2:
+                            if(item.status)
+                                res.push(item);
+                            break;
+                        case 3:
+                            if(item.like_users.indexOf(user) > -1)
+                                res.push(item);
+                            break;
+                        case 4:
+                            if(item.username == user)
+                                res.push(item);
+                            break;
+                        case 5:
+                            if(item.buyer != null)
+                                if(item.buyer.name == user)
+                                    res.push(item);
+                            break;
+                    }
+                });
+                return res;
+            }
+            else {
+                return items;
+            }
+        }
+    });
+
+    itemcards.filter("dateFilter", function($filter){
+        return function(date) {
+            // console.log(date);
+            var itemDateMin = $filter('date')(new Date(date), 'mm');
+            var nowDateMin = $filter('date')(Date.now(), 'mm');
+
+            var secDiff = parseInt((Date.now() - new Date(date))/1000);
+            var minDiff = parseInt(secDiff/60);
+            var hrDiff = parseInt(minDiff/60);
+            var dayDiff = parseInt(hrDiff/24);
+
+            if(dayDiff)
+                return dayDiff + " 일 전";
+            else if(hrDiff)
+                return hrDiff + " 시간 전";
+            else if(minDiff)
+                return minDiff + " 분 전";
+            else if(secDiff)
+                return secDiff + " 초 전";
+        }
+    });
+</script>
+
+<body>
+<div class="container" ng-app="ItemCards" ng-controller="ItemCardsCtrl">
+    <div class="row">
+        <nav class="z-depth-3">
+            <div class="nav-wrapper">
+                <a href="#" class="brand-logo center"><img class="responsive-img" id="logo" src="images/logo.png"></a>
+    
+                    <div class="input-field ">
+                        <input id="search" type="search" placeholder="키워드 검색" required ng-model="searchFilter">
+                        <label class="label-icon" for="search"><i class="material-icons">search</i></label>
+                        <i class="material-icons" id="search_reset">close</i>
+                    </div>
+            </div>
+        </nav>
+        <div class="card-panel grey lighten-3 z-depth-3 hoverable">
+            <blockquote><h1>책</h1></blockquote>
+            <div class="row">
+                <div class="col s12">
+                  <ul class="tabs">
+                    <li class="tab col s2">
+                        <a class="active" href="" ng-click="tabFilterChange('')">전체</a>
+                    </li>
+                    <li class="tab col s2">
+                        <a href="" ng-click="tabFilterChange(2)">판매중</a>
+                    </li>
+                    <li class="tab col s2">
+                        <a href="" ng-click="tabFilterChange(3)">찜한 상품</a>
+                    </li>
+                    <li class="tab col s3">
+                        <a href="" ng-click="tabFilterChange(4)">내가 등록한 매물</a>
+                    </li>
+                    <li class="tab col s3">
+                        <a href="" ng-click="tabFilterChange(5)">내가 구매한 매물</a>
+                    </li>
+                </ul>
+                <ul class="tabs">
+                    <li class="tab col s3">
+                        <a class="active" href="" ng-click="tabFilterChangeOrder('-regdate')">등록시간 순</a>
+                    </li>
+                    <li class="tab col s3">
+                        <a href="" ng-click="tabFilterChangeOrder('-hit')">조회수 순</a>
+                    </li>
+                    <li class="tab col s3">
+                        <a href="" ng-click="tabFilterChangeOrder('-like_count')">좋아요 순</a>
+                    </li>
+                    <li class="tab col s3">
+                        <a href="" ng-click="tabFilterChangeOrder('-price')">가격 순</a>
+                    </li>
+                  </ul>
+
+                </div>
+              </div>
+            <div class="row">
+                <div ng-repeat="item in items | filter:searchFilter | tabFilter:this | orderBy: tabFilterOrderProp : tabFilterOrderType" class='{{ item.status ? "" : "opacity" }}'>
+                    <!-- <div ng-switch-when="on"> -->
+                        <div class="col s12 m6 l4 xl4">
+                            <a href="" class="black-text btn_read" ng-click="getItemData(item._id)">
+                            <div class="card hoverable z-depth-2 {{ item.buyer == logined_user ? 'green lighten-4' : '' }}">
+                                <div class="card-image" ng-switch="item.like_users.indexOf(logined_user)>-1?true:false">
+                                    <img ng-src="{{ item.image[0].path | imgPathExp }}" class="img_thumb">
+                                    <a class="btn-floating halfway-fab waves-effect waves-light lighten-1 grey" id="lk_{{item._id}}" ng-switch-when="false" value="{{item.like_users.indexOf(logined_user)>-1?true:false}}" ng-click="itemLike(item._id)"><i class="material-icons">favorite</i></a>
+                                    <a class="btn-floating halfway-fab waves-effect waves-light lighten-1 red" id="lk_{{item._id}}" ng-switch-when="true" value="{{item.like_users.indexOf(logined_user)>-1?true:false}}" ng-click="itemLike(item._id)"><i class="material-icons">favorite</i></a>
+                                </div>
+                                <div class="card-title truncate item_title">
+                                    {{ item.title }}
+                                </div>
+                                <div class="card-content ">
+                                    <p class="truncate">{{ item.content }}</p>
+                                </div>
+                                <div class="card-action truncate">
+                                    <div class="chip" ng-repeat="tag in item.tag">
+                                        {{tag.tag}}
+                                    </div>
+                                </div>
+                                <div class="card-action">
+                                    <div class="row">
+                                        <div class="col s12 center">
+                                            <div class="chip">
+                                                <img img-check="{{item.username}}">
+                                                {{item.username}}
+                                            </div>
+                                        </div>
+                                        <div class="col s6">
+                                            <span class="valign-wrapper right right-align grey-text text-darken-2"><i class="material-icons">visibility</i>&nbsp;{{ item.hit }}</span>
+                                        </div>
+                                        <div class="col s6">
+                                            <span class="valign-wrapper center center-align grey-text text-darken-1">
+                                                <i class="material-icons">favorite</i>&nbsp;
+                                                <span id="lc_{{ item._id }}">{{ item.like_count }}</span>
+                                            </span>                                            
+                                        </div>
+                                        
+                                    </div>
+                                </div>
+
+                                <div class="card-action">
+                                    <div class="row">
+                                        <div class="col s12">
+                                            <h5 class="center green-text">{{ item.price | currency:"&#8361;&nbsp;":0 }} </h5>
+                                            
+                                            <div class="grey-text center">{{ item.regdate | dateFilter }} </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            </a>
+                        </div>
+                    <!-- </div> -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="fixed-action-btn ">
+        <a class="btn-floating btn-large red pulse" id="fab_menu">
+          <i class="large material-icons">menu</i>
+        </a>
+        <ul>
+          <li><a href="http://google.com" class="btn-floating orange "><i class="material-icons">construction</i></a></li>
+          <li><a class="btn-floating green btn clr" href="#write" id="fab_write"><i class="material-icons">edit</i></a></li>
+          <li><a class="btn-floating blue btn clr" href="#login" id="fab_login"><i class="material-icons">person</i></a></li>
+        </ul>
+        <div class="tap-target" data-target="fab_login">
+            <div class="tap-target-content">
+                <h5>로그인을 먼저 해주세요 !</h5>
+                <p>사이트 이용을 위해서는 로그인이 필요합니다</p>
+            </div>
+        </div>
+    </div>
+
+      <div id="write" class="modal ">
+        <div class="modal-content z-depth-3 center">
+            <div class="container">
+                <form action="/write" method="post" id="form_write" enctype="multipart/form-data">
+                    <!-- <input name="username" id="username" type="hidden" value=<%= username %> > -->
+                    <!-- <input name="tag[]" id="tag" type="hidden"> -->
+                    <div class="row">
+                        <h1>매물 등록</h1>
+                        <div class="card-panel col s12">
+                            <div class="input-field col s12">
+                                <i class="material-icons prefix">format_quote</i>
+                                <input id="title" name="title" type="text" class="validate" required>
+                                <label for="title">매물명</label>
+                            </div>
+                            <div class="input-field col s12">
+                                <i class="material-icons prefix">subtitles</i>
+                                <textarea id="content" name="content" class="materialize-textarea validate" required></textarea>
+                                <label for="content">매물 설명</label>
+                            </div>
+                                       
+                            <div class="input-field col s1 valign-wrapper">
+                                <i class="material-icons prefix">tag</i>
+                            </div>
+                            <div class="input-field col s11">
+                                <div class="chips chips-placeholder" id="upload_tag"></div>
+                            </div>
+
+                            <div class="input-field col s1 valign-wrapper">
+                                <i class="material-icons prefix">upload_file</i>
+                            </div>
+                            <div class="input-field file-field col s11">
+                                  <div class="file-path-wrapper">
+                                    <input type="file" id="upload_img" name="images[]" accept="image/*" multiple>
+                                    <input class="file-path validate" type="text" placeholder="하나 이상의 사진 첨부">
+                                  </div>
+                            </div>
+
+                            <div class="input-field col s6">
+                                <i class="material-icons prefix">sell</i>
+                                <input id="price" name="price" type="number" class="validate" required>
+                                <label for="price">판매가격</label>
+                            </div>
+                            
+                            <div class="input-field col s6">
+                                <div class="switch">
+                                    <label>
+                                      판매완료
+                                      <input type="checkbox" checked id="upload_status">
+                                      <span class="lever"></span>
+                                      판매중
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="col s12">
+                                <button class="btn-large waves-effect waves-light green" type="button" name="action" id="btn_write">등록
+                                    <i class="material-icons right">post_add</i>
+                                </button>
+                                <div class="progress">
+                                    <div class="indeterminate"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+      </div>
+
+      <div id="update" class="modal ">
+        <div class="modal-content z-depth-3 center">
+            <div class="container">
+                <form id="form_update">
+                    <div class="row">
+                        <h1>매물 수정</h1>
+                        <div class="card-panel col s12">
+                            <div class="input-field col s12">
+                                <i class="material-icons prefix">format_quote</i>
+                                <input  name="title" type="text" class="validate" required ng-model="readItem.title">
+                                <label for="title">매물명</label>
+                            </div>
+                            <div class="input-field col s12">
+                                <i class="material-icons prefix">subtitles</i>
+                                <textarea  name="content" class="materialize-textarea validate" required>{{readItem.content}}</textarea>
+                                <label for="content">매물 설명</label>
+                            </div>
+                                       
+                            <div class="input-field col s1 valign-wrapper">
+                                <i class="material-icons prefix">tag</i>
+                            </div>
+                            <div class="input-field col s11">
+                                <div class="chips chips-initial chips-placeholder" id="update_tag"></div>
+                            </div>
+
+                            <div class="input-field col s1 valign-wrapper">
+                                <i class="material-icons prefix">upload_file</i>
+                            </div>
+                            <div class="input-field file-field col s11">
+                                  <div class="file-path-wrapper">
+                                    <input type="file" id="update_img" name="images[]" accept="image/*" multiple>
+                                    <input class="file-path validate" type="text" placeholder="하나 이상의 사진 첨부">
+                                  </div>
+                            </div>
+
+                            <div class="input-field col s6">
+                                <i class="material-icons prefix">sell</i>
+                                <input  name="price" type="number" class="validate" required ng-model="readItem.price">
+                                <label for="price">판매가격</label>
+                            </div>
+                            
+                            <div class="input-field col s6">
+                                <div class="switch">
+                                    <label>
+                                      판매완료
+                                      <input type="checkbox" ng-model="readItem.status" id="update_status">
+                                      <span class="lever"></span>
+                                      판매중
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="col s12">
+                                <button class="btn-large waves-effect waves-light blue" type="button" ng-click="itemUpdate(readItem)">수정
+                                    <i class="material-icons right">edit</i>
+                                </button>
+                                <div class="progress">
+                                    <div class="indeterminate"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+      </div>
+
+      <div id="register" class="modal ">
+        <div class="modal-content z-depth-3 center">
+            <div class="container ">
+                <form id="form_register">
+                    <div class="row">
+                        <h1>회원가입</h1>
+                        <div class="card-panel col s12">
+                            <div class="input-field col s6">
+                                <i class="material-icons prefix">account_circle</i>
+                                <input id="username" name="username" type="text" class="validate" required>
+                                <label for="username">아이디</label>
+                            </div>
+                            <div class="input-field col s6">
+                                <i class="material-icons prefix">key</i>
+                                <input id="password_register" name="password" type="password" class="validate" required>
+                                <label for="password_register">비밀번호</label>
+                            </div>
+                            <div class="input-field col s6">
+                                <i class="material-icons prefix">phone_iphone</i>
+                                <input id="phone" name="phone" type="number" class="validate" required>
+                                <label for="phone">연락처</label>
+                            </div>
+                            
+                            <div class="input-field col s6">
+                                <i class="material-icons prefix">location_on</i>
+                                <input id="location" name="location" type="text" placeholder="ex) 서울 노원" class="validate" required>
+                                <label for="location">지역(시/군/구)</label>
+                            </div>
+
+                            <div class="input-field col s1 valign-wrapper">
+                                <i class="material-icons prefix">upload_file</i>
+                            </div>
+                            <div class="input-field file-field col s11">
+                                  <div class="file-path-wrapper">
+                                    <input type="file" name="pfp" accept="image/*">
+                                    <input class="file-path validate" type="text" placeholder="프로필 사진 첨부">
+                                  </div>
+                            </div>
+                            
+                            <button class="btn-large waves-effect waves-light cyan" type="button" id="btn_register_apply">
+                                가입
+                                <i class="material-icons right">send</i>
+                            </button>
+                            <div class="progress">
+                                <div class="indeterminate"></div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+      </div>
+
+      <div id="login" class="modal  bottom-sheet">
+        <div class="modal-content z-depth-3 center">
+            <div class="container ">
+                <form method="post" id="form_login">
+                    <div class="row">
+                        <h1>{{is_logined ? '회원정보' : '로그인'}}</h1>
+                        <div class="card-panel col s12">
+
+                            <div class="col s12" ng-if="!is_logined">
+                                <div class="input-field col s12">
+                                    <i class="material-icons prefix">account_circle</i>
+                                    <input id="login_username" name="login_username" type="text" class="validate" required>
+                                    <label for="login_username">아이디</label>
+                                </div>
+                                <div class="input-field col s12" ng-if="!is_logined">
+                                    <i class="material-icons prefix">key</i>
+                                    <input id="login_password" name="login_password" type="password" class="validate" required>
+                                    <label for="login_password">비밀번호</label>
+                                </div>
+                                <div class="col s6">
+                                    <button class="btn-large waves-effect waves-light clr cyan" type="button" name="action" id="btn_register">회원가입
+                                        <i class="material-icons right">person_add</i>
+                                    </button>
+                                </div>
+                                <div class="col s6">
+                                    <button class="btn-large waves-effect waves-light " type="button" name="action" id="btn_login">로그인
+                                        <i class="material-icons right">login</i>
+                                    </button>
+                                </div>
+                                <div class="progress">
+                                    <div class="indeterminate"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="col s12" ng-if="is_logined">
+                                <div class="input-field col s12">
+                                    <div class="chip adjust-text">
+                                        <img img-check="{{logined_user}}">
+                                        {{logined_user}}
+                                    </div>
+                                </div>
+                                <button class="btn-large waves-effect waves-light clr grey" type="button" name="action" id="btn_logout">로그아웃
+                                    <i class="material-icons right">logout</i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+      </div>
+
+      <div id="read" class="modal">
+        <div class="modal-content z-depth-3 center" id="nomg">
+            <div class="carousel" id="item_carousel">
+                
+                <div ng-if="readItem.image == ''">
+                <a class="carousel-item valign-wrapper" ><img src="images/logo.png" ng-init="onEnd(false)"></a>
+                </div>
+
+                <div ng-if="readItem.image">
+                <a class="carousel-item valign-wrapper" ng-repeat="img in readItem.image" repeat-end="onEnd(true)">
+                    <img ng-src="{{ img.path.substr(7) }}">
+                </a>
+                </div>
+
+              </div>
+            <div class="container">
+                <div class="row">
+                    <div class="card-panel col s12">
+                        <div ng-repeat="item in items | filter:searchFilter" class='{{ item.status ? "" : "opacity" }}'></div>
+                        
+                        <blockquote class="left-align"><h3>{{readItem.title}}</h3></blockquote>
+
+                        <ul class="collapsible">
+                            <li class="active">
+                                <div class="collapsible-header deep-orange lighten-5">
+                                    <h5><i class="material-icons">article</i>매물 설명</h5>
+                                </div>
+                                <div class="collapsible-body left-align" >
+                                    <p ng-repeat="c in readItem.content | newlines track by $index">
+                                        {{ c=='' ? '&nbsp;' : c }}
+                                    </p>
+                                </div>
+                            </li>
+                            <li class="active">
+                                <div class="collapsible-header deep-orange lighten-5">
+                                    <h5><i class="material-icons">sell</i>판매 가격</h5>
+                                </div>
+                                <div class="collapsible-body left-align">
+                                    <h4>&#8361; <span class="light-green-text">{{readItem.price | currency:"":0}}</span></h4>
+                                </div>
+                            </li>
+                            <li class="active">
+                                <div class="collapsible-header deep-orange lighten-5">
+                                    <h5><i class="material-icons">tag</i>태그</h5>
+                                </div>
+                                <div class="collapsible-body">
+                                    <div class="chip" ng-repeat="tag in readItem.tag">
+                                        {{tag.tag}}
+                                    </div>
+                                </div>
+                            </li>
+                            <li ng-show="readItem.status">
+                                <div class="collapsible-header deep-orange lighten-5">
+                                    <h5><i class="material-icons">phone_iphone</i>문의</h5>
+                                </div>
+                                <div class="collapsible-body left-align">
+                                    <h4 class="center-align">{{readItem.phone | phoneExp}}</h4>
+                                </div>
+                            </li>
+
+                            <li class="active" ng-show="readItem.buyer">
+                                <div class="collapsible-header deep-orange {{readItem.status ? 'lighten-3' : 'lighten-5'}}">
+                                    <h5><i class="material-icons">thumb_up</i>{{readItem.status ? '거래중..' : '판매완료'}}</h5>
+                                  </div>
+                                <div class="collapsible-body">
+                                    <div ng-show="readItem.buyer.name == logined_user || readItem.username == logined_user">
+                                        <div class="chip adjust-text">
+                                            <!-- <img ng-init="getImg(readItem.buyer.name, readItem._id)" id="img_{{readItem._id}}"> -->
+                                            <img img-check="{{readItem.buyer.name}}">
+                                            {{readItem.buyer.name}}
+                                        </div>
+                                        <div class="chip adjust-text">
+                                            <img src="images/phone.png">
+                                            {{readItem.buyer.phone | phoneExp }}
+                                        </div>
+                                    </div>
+                                    <div class="row" ng-show="readItem.username == logined_user && readItem.status">
+                                        <div class="col s6">
+                                            <button class="btn-large waves-effect waves-light deep-purple" type="button" ng-click="itemBuy(readItem._id, false)">저리가요
+                                                <i class="material-icons right">waving_hand</i>
+                                            </button>
+                                        </div>
+                                        <div class="col s6">
+                                            <button class="btn-large waves-effect waves-light green" type="button" ng-click="itemBuy(readItem._id, true)">거래완료
+                                                <i class="material-icons right">handshake</i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+                        </ul>
+                                    
+                        <div ng-if="readItem.username == logined_user">
+
+                            <div class="col s6">
+                                <button class="btn-large waves-effect waves-light red" type="button" ng-click="itemDelete(readItem._id)">삭제
+                                    <i class="material-icons right">delete</i>
+                                </button>
+                            </div>
+                            <div class="col s6">
+                                <button class="btn-large waves-effect waves-light blue " type="button" ng-click="btnItemUpdate(readItem)" ng-disabled="readItem.buyer">수정
+                                    <i class="material-icons right">edit</i>
+                                </button>
+                            </div>
+                        </div>
+                        <div ng-if="readItem.username != logined_user">
+                            <button class="btn-large waves-effect waves-light green" type="button" ng-click="btnItemBuy(readItem._id)" ng-disabled="!readItem.status || readItem.buyer">구매
+                                <i class="material-icons right">sell</i>
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+      </div>
+</div>
+</body>
+
+<!--Import jQuery before materialize.js-->
+<script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js" ></script>
+<script type="text/javascript" src="javascripts/materialize.min.js"></script>
+<!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js" ></script> -->
+
+
+<script>
+    $(document).ready(function(){
+        $('.fixed-action-btn').floatingActionButton();
+        $('.tap-target').tapTarget();
+        $('.modal').modal();
+        $('.tabs').tabs();
+        // M.AutoInit();
+
+        $('.clr').click(function(event){
+            $('form').each(function(){this.reset();});
+        })
+
+        $('.chips-placeholder').chips({
+            placeholder: '태그 추가',
+            secondaryPlaceholder: '+ 태그',            
+        });
+
+        $('#btn_write').click(function(event){
+            var data_tag = M.Chips.getInstance($('#upload_tag')).chipsData;
+            var data_status = $('#upload_status').prop('checked');
+            
+            var formData = new FormData($('#form_write')[0]);
+            formData.append('tag', JSON.stringify(data_tag));
+            formData.append('status', data_status);
+
+            $.ajax({
+                type: "POST",
+                processData: false,
+                contentType: false,
+                dataType: "JSON",
+                enctype: 'multipart/form-data',
+                url: '/write',
+                data : formData,
+                success: function(res){
+                    console.log(res);
+                    location.replace('/');
+                },
+                error: function(req, status, err){
+                    M.toast({html: '매물 등록 오류, 로그 확인'});
+                    console.log(err);
+                }
+            });
+        });
+
+        $('#btn_register').click(function(event){
+            M.Modal.getInstance($('#register')).open();
+        });
+
+        $('#btn_register_apply').click(function(event){
+            // var form_Data = $('#form_register').serialize();
+            // console.log(form_Data);
+            var formData = new FormData($('#form_register')[0]);
+            console.log(formData);
+
+            $.ajax({
+                type: "POST",
+                processData: false,
+                contentType: false,
+                dataType: "JSON",
+                enctype: 'multipart/form-data',
+                url: '/register',
+                data : formData,
+                success: function(res){
+                    if(res){
+                        // register success
+                        M.toast({html: '회원가입 성공 !'});
+                        M.Modal.getInstance($('#register')).close();
+                    }else{
+                        // register fail
+                        M.toast({html: '이미 존재하는 아이디입니다.'});
+                        $('#username').focus();
+                    }
+                },
+                error: function(req, status, err){
+                    M.toast({html: '회원가입 오류, 로그 확인'});
+                    console.log(err);
+                }
+            });
+        });
+
+        $('#btn_login').click(function(event){
+            var formData = $('#form_login').serialize();
+
+            $.post('/login', formData, function(res){
+                if(!res){
+                    // login fail
+                    M.toast({html: '아이디 또는 비밀번호를 확인'});
+                    $('#username').focus();
+                }
+                else {
+                    location.replace('/');
+                }
+            }).fail(function(res){
+                M.toast({html: '로그인 오류, 로그 확인'});
+                console.log(res);
+            });
+        });
+
+        $('#btn_logout').click(function(event){
+            location.replace('/logout');
+        });
+
+        $('#fab_write').click(function(event){
+            if(<%= !is_logined %>)
+                M.TapTarget.getInstance($('.tap-target')).open();
+            else
+                M.Modal.getInstance($('#write')).open();            
+        });
+
+        $('#fab_login').click(function(event){
+            M.Modal.getInstance($('#login')).open();
+        });
+
+        $('#search_reset').click(function(event){
+            $('#search').val("");
+        });
+  });
+</script>
+
+</html>
