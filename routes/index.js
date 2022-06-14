@@ -45,7 +45,7 @@ var storageImg = multer.diskStorage({
 
 var storageImgPFP = multer.diskStorage({
     destination: function(req, file, cb){
-        const path = `public/upload-images/${req.body.username}/`;
+        const path = `public/upload-images/${req.body.register_username}/`;
         fs.mkdir(path, {recursive: true}, function(err){
             if(err)
                 console.err('err' + err);
@@ -69,37 +69,33 @@ var uploadpfp = multer({
 router.use(bodyparser.urlencoded({extended: false}));
 
 router.get('/', function (req, res, next){
-    var usr = req.session.username;
-    var data = {is_logined: req.session.is_logined, username: usr, item: ""};
-
-    /*
-    ItemModel.update({}, 
-        {$set: {like_users: {usr: false}}},
-        {multi: true},
-        function(err, doc){
-            if(err){
-                console.error('err', err);
-                
-            }
-            console.log(doc);
-            // if(doc) res.send(true);
-            // else    res.send(false);
-    });
-    */
+    var data = {
+        is_logined: req.session.is_logined, 
+        username: req.session.username, 
+        is_admin: req.session.admin,
+        logined_loc: req.session.location,
+        item: "",
+        user: ""
+    };
     
     var im = ItemModel.find({});
-    im.sort({'regdate': -1});
     im.exec(function (err, doc){
-        if(err){
-            console.error('err', err);
-            
-        }
-
+        if(err) console.error('err', err);
         if(doc != null){
             data['item'] = doc;
-        }
 
-        res.render('index', data);
+            if(req.session.admin){
+                UserModel.find({}, function(err, doc){
+                    if(err) console.error('err', err);
+                    if(doc != null){
+                        data['user'] = doc;
+                        res.render('index', data);
+                    }
+                });
+            }else{
+                res.render('index', data);
+            }
+        }
     });
 });
 
@@ -129,7 +125,6 @@ router.get('/like/:id/:fav', function(req, res, next){
             }
             if(doc) res.send(true);
             else    res.send(false);
-            console.log(doc);
     });
 })
 
@@ -141,17 +136,13 @@ router.get('/read/:id', function(req, res, next){
         {_id: item_obj_id}, 
         {$inc: {hit: 1}},
         function(err, doc){
-            if(err){
-                console.error('err', err);
-                
-            }
+        if(err) console.error('err', err);
     });
 
     ItemModel.findOne({_id: item_obj_id}, function(err, doc){
-        if(err){
-            console.error('err', err);
-            
-        } 
+        if(err) console.error('err', err);
+
+        console.log(doc);
         res.json(doc);
     })
 });
@@ -172,13 +163,11 @@ router.get('/buy/:id', function(req, res, next){
         {$set: reqItem}, 
         {upsert: true},
         function(err, doc){
-        if(err) console.error('err', err);
-        if(doc) {
-            console.log(doc);
-            res.send(true);
+            if(err) console.error('err', err);
+            if(doc) res.send(true);
+            else    res.send(false);
         }
-        else    res.send(false);
-    });
+    );
 });
 
 router.post('/buy', function(req, res, next){
@@ -187,7 +176,6 @@ router.post('/buy', function(req, res, next){
     var confirm = JSON.parse(req.body.confirm);
     var query_req = {_id: req.body.oid};
     var query_update = {};
-    console.log(confirm);
 
     if(confirm){
         query_update['status'] = false;
@@ -200,16 +188,11 @@ router.post('/buy', function(req, res, next){
         {$set: query_update}, 
         // {upsert: true},
         function(err, doc){
-        if(err){
-            console.error('err', err);
-            
+            if(err) console.error('err', err);
+            if(doc) res.send(true);
+            else    res.send(false);
         }
-        if(doc) {
-            console.log(doc);
-            res.send(true);
-        }
-        else    res.send(false);
-    });
+    );
 });
 
 router.get('/delete/:id', function(req, res, next){
@@ -226,12 +209,35 @@ router.get('/delete/:id', function(req, res, next){
     });
 });
 
+router.post('/delete', function(req, res, next){
+    var type = req.body.type;
+    var oid = req.body.oid;
+
+    if(type=='user'){
+        UserModel.remove({_id: oid}, function(err, doc){
+            if(err)
+                console.error("err", err);
+            if(doc) res.send(true);
+            else    res.send(false);
+        });
+    }
+    if(type=='item'){
+        ItemModel.remove({_id: oid}, function(err, doc){
+            if(err)
+                console.error('err', err);
+            if(doc) res.send(true);
+            else    res.send(false);
+        })
+    }
+})
+
 router.post('/write', upload.any(), function (req, res, next) {
 
     var Item = new ItemModel({
         title: req.body.title,
         content: req.body.content,
         username: req.session.username,
+        location: req.body.location,
         phone: req.session.phone,
         status: req.body.status,
         price: req.body.price,
@@ -267,67 +273,93 @@ router.post('/update', upload.any(), function(req, res, next){
         {$set: reqItem}, 
         // {upsert: true},
         function(err, doc){
-        if(err){
-            console.error('err', err);
-            
+            if(err) console.error('err', err);
+            if(doc) res.send(true);
+            else    res.send(false);
         }
-        if(doc) {
-            console.log(doc);
-            res.send(true);
-        }
-        else    res.send(false);
-    });
+    );
 });
 
-router.post('/register', uploadpfp.single('pfp'), function (req, res, next) {
-    var hash_pw = crypto.createHash("sha512").update(req.body.password).digest("hex");
-    var usr = req.body.username.toLowerCase();
+router.post('/review', function(req, res, next){
+    var Oid = require('mongodb').ObjectId;
+    var item_obj_id = new Oid(req.body._id);
 
-    console.log("body: %j", req.body);
-    console.log(req.file);
+    var content = req.body.review_content;
+    var rate = req.body.review_rate;
+    var query_update = {
+        review: { 'content': content, 'rate': rate }
+    }
+
+    ItemModel.update(
+        {_id: item_obj_id},
+        {$set: query_update},
+        {upsert: true},
+        function(err, doc){
+            if(err) console.error('err', err);
+            if(doc) res.send(true);
+            else    res.send(false);
+
+            console.log(doc);
+        }
+    );
+});
+
+router.post('/register', uploadpfp.single('register_pfp'), function (req, res, next) {
+    var hash_pw = crypto.createHash("sha512").update(req.body.register_password).digest("hex");
+    var usr = req.body.register_username.toLowerCase();
+    
 
     // DB model create & save.
     var User = new UserModel({
         username: usr,
         password: hash_pw,
-        phone: req.body.phone,
-        location: req.body.location,
-        pfp: req.file
+        phone: req.body.register_phone,
+        location: req.body.register_location,
+        pfp: req.file,
+        admin: false
     });
-     
-    UserModel.findOne({username: req.body.username}, function(err, doc){
-        if(err){
-            console.error('err', err);
-        }
 
-        if(!doc) {
-            User.save(function (err, res) {
-                if(err) {
-                    console.error('err', err);
-                    
-                }
-            });
-            res.send(true)
-        } else {
-            res.send(false);
-        }
-    });
+    UserModel.findOne({}, function(err, doc){
+        if(err)
+            console.error('err', err);
         
+        if(!doc)
+            User.admin = true;
+
+        UserModel.findOne({username: req.body.username}, function(err, doc){
+            if(err)
+                console.error('err', err);
+    
+            if(!doc) {
+                User.save(function (err, res) {
+                    if(err)
+                        console.error('err', err);
+                });
+                res.send(true)
+            } else {
+                res.send(false);
+            }
+        });
+    });        
 });
 
 router.post('/login', function(req, res, next) {
     var hash_pw = crypto.createHash("sha512").update(req.body.login_password).digest("hex");
     var usr = req.body.login_username.toLowerCase();
 
+    console.log(usr);
+
     UserModel.findOne({username: usr, password: hash_pw}, function(err, doc){
-        if(err){
-            console.error('err', err);
-        }
+        if(err) console.error('err', err);
 
         if(doc) {
             req.session.is_logined = true;
             req.session.username = usr;
             req.session.phone = doc.phone;
+            req.session.admin = doc.admin;
+            req.session.location = doc.location;
+
+            // console.log(doc.admin);
             req.session.save(function(){
                 res.send(true);
             });

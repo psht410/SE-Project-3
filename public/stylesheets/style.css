@@ -110,3 +110,7 @@ select {
 .adjust-text {
   font-size: 1.5em;
 }
+
+.helper-text {
+  display: flex !important;
+}

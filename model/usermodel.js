@@ -3,15 +3,20 @@ var mongoose = require('mongoose');
 var UserSchema = new mongoose.Schema({
     username: {
         type: String,
-        unique: true
+        unique: true,
+        lowercase: true
     },
     password: String,
     phone: Number,
     location: String,
+    admin: {
+        type: Boolean,
+        default: false
+    },
     pfp: mongoose.Schema.Types.Mixed,
     regdate: {
-        "type": Date,
-        "default": Date.now
+        type: Date,
+        default: Date.now
     }
 });
 

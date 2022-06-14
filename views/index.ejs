@@ -21,20 +21,35 @@
 
     <link rel="stylesheet" href="//unpkg.com/ng-table@2.0.2/bundles/ng-table.min.css">
     <script src="//unpkg.com/ng-table@2.0.2/bundles/ng-table.min.js"></script>
+
+    <!-- Google Search Console -->
+    <meta name="google-site-verification" content="Eek9pXqE3Q6sdTNr3c_4Sq2PRGoqOg19azadYkV25Vo" />
+
+
 </head>
 
 <script>
-    var data = <%- JSON.stringify(item) %>;
+    var dataitems = <%- JSON.stringify(item) %>;
+    var data = <%- JSON.stringify(user) %>;
+
     var user = "<%= username %>";
     var is_logined = "<%= is_logined %>";
+    var is_admin = "<%= is_admin %>";
+    var logined_loc = "<%= logined_loc %>";
 
     "use strict";
 
-    var itemcards = angular.module("ItemCards", []);
+    var itemcards = angular.module("ItemCards", ['ngTable']);
     itemcards.controller("ItemCardsCtrl", function($scope, $http){
-        $scope.items = data;
+        $scope.items = dataitems;
+        $scope.users = data;
+        $scope.api_key = "AIzaSyCDjId6ypusRJUGCGrdJV2RZnicBtm9h1k";
+
+        $scope.logined_loc = logined_loc;
         $scope.logined_user = user;
-        $scope.is_logined = is_logined;
+        $scope.is_logined = is_logined=='true'?true:false;
+        $scope.is_admin = is_admin=='true'?true:false;
+
         $scope.tabFilterType = "";
         $scope.tabFilterOrderProp = '-regdate';
         $scope.tabFilterOrderType = false;
@@ -61,9 +76,10 @@
                 }).then(function ifOK(res){
                     $scope.readItem = res.data;
                     M.Modal.getInstance($('#read')).open(); 
-
+                    // M.updateTextFields();
+                    // $('input, textarea').each(function(){this.focus();});
                 }, function ifErr(res){
-                    console.log("err : " + res);
+                    console.error("err : ", res);
                 });
             }
         };
@@ -88,23 +104,65 @@
             var isOK = confirm("진짜 지워요 ?");
 
             if(isOK){
-                $http({
-                    method: 'GET',
-                    url: '/delete/' + itemId
-                }).then(function ifOK(res){
-                    if(res)
-                        location.replace('/');
+                    var reqData = {
+                        oid : itemId,
+                        type: "item"
+                    };
 
-                }, function ifErr(res){
-                    console.log("err : " + res);
-                });
-            }    
+                    $.ajax({
+                        type: "POST",
+                        dataType: "JSON",
+                        url: '/delete',
+                        data : reqData,
+                        success: function(res){
+                            M.Modal.getInstance($('#read')).close();
+                            $('#card_'+itemId).remove();
+                            M.toast({html: "삭제 완료"});
+                            // location.replace('/');
+                        },
+                        error: function(req, status, err){
+                            M.toast({html: '매물 삭제 오류, 로그 확인'});
+                            console.error('err', err);
+                        }
+                    });
+                }   
         };
+
+        $scope.userDelete = function(userId){
+            if(is_admin){
+                var isOK = confirm("진짜 지웁니다 ?");
+
+                if(isOK){
+                    var reqData = {
+                        oid : userId,
+                        type: "user"
+                    };
+
+                    $.ajax({
+                        type: "POST",
+                        dataType: "JSON",
+                        url: '/delete',
+                        data : reqData,
+                        success: function(res){
+                            $('#tr_'+userId).remove();
+                            M.toast({html: "삭제 완료"});
+                        },
+                        error: function(req, status, err){
+                            M.toast({html: '유저 삭제 오류, 로그 확인'});
+                            console.error('err', err);
+                        }
+                    });
+                }
+            }
+        }
 
         $scope.btnItemUpdate = function(item){
             M.Modal.getInstance($('#update')).open(); 
+            M.textareaAutoResize($('textarea'));
+            M.updateTextFields();
 
-            $('#update input, #update textarea').each(function(){this.focus();});
+            $('input, textarea').each(function(){this.focus();});
+
             $('.chips-initial').chips({
                 data: item.tag
             });
@@ -129,12 +187,11 @@
                 url: '/update',
                 data : formData,
                 success: function(res){
-                    console.log(res);
                     location.replace('/');
                 },
                 error: function(req, status, err){
                     M.toast({html: '매물 수정 오류, 로그 확인'});
-                    console.log(err);
+                    console.error('err', err);
                 }
             });
         }
@@ -153,7 +210,7 @@
                         M.toast({html: "구매 실패"});
 
                 }, function ifErr(res){
-                    console.log("err : " + res);
+                    console.error("err : ", res);
                 });
             }    
         }
@@ -170,12 +227,11 @@
                 url: '/buy',
                 data : reqData,
                 success: function(res){
-                    console.log(res);
                     location.replace('/');
                 },
                 error: function(req, status, err){
                     M.toast({html: '판매 처리 오류, 로그 확인'});
-                    console.log(err);
+                    console.error('err', err);
                 }
             });
         }
@@ -189,34 +245,83 @@
                 var a_val = a_tag.attr('value');
                 var lc_tag = $('#lc_'+itemId);
                 
-                if(JSON.parse(a_val)){
-                    // is favor-ed
-                    a_tag.attr('class', a_class.replace('red', 'grey'));
-                    a_tag.attr('value', a_val.replace('true', 'false'));
-                    lc_tag.text(Number(lc_tag.text()) - 1);
-                }else{
-                    // is not favor-ed
-                    a_tag.attr('class', a_class.replace('grey', 'red'));
-                    a_tag.attr('value', a_val.replace('false', 'true'));
-                    lc_tag.text(Number(lc_tag.text()) + 1);
-                }
                         
                 $http({
                         method: 'GET',
                         url: '/like/' + itemId + '/' + a_val
                     }).then(function ifOK(res){
                         if(res){
-
-                        }else{
-
+                            if(JSON.parse(a_val)){
+                                // is favor-ed
+                                a_tag.attr('class', a_class.replace('red', 'grey'));
+                                a_tag.attr('value', a_val.replace('true', 'false'));
+                                lc_tag.text(Number(lc_tag.text()) - 1);
+                            }else{
+                                // is not favor-ed
+                                a_tag.attr('class', a_class.replace('grey', 'red'));
+                                a_tag.attr('value', a_val.replace('false', 'true'));
+                                lc_tag.text(Number(lc_tag.text()) + 1);
+                            }
                         }
-
                     }, function ifErr(res){
-                        console.log("err : " + res);
+                        console.error("err : ", res);
                     });
             }
         }
+    
+        $scope.btnAdminMenu = function(){
+            if(is_admin)
+                M.Modal.getInstance($('#adminMenu')).open();
+        }
+        
+        $scope.itemReview = function(itemId){
+            var formData = new FormData($('#form_review')[0]);
+
+            var reqData = {
+                '_id': itemId,
+                'review_rate': formData.get('review_rate'),
+                'review_content': formData.get('review_content')
+            };
+
+            $.ajax({
+                type: "POST",
+                dataType: "JSON",
+                url: '/review',
+                data : reqData,
+                success: function(res){
+                    if(res){
+                        M.toast({html: "리뷰 작성 성공"});
+                        M.Modal.getInstance($('#read')).close();
+                    }
+                    else
+                        M.toast({html: "외않되"});
+                    // location.replace('/');
+                },
+                error: function(req, status, err){
+                    M.toast({html: '리뷰 작성 오류, 로그 확인'});
+                    console.error('err', err);
+                }
+            });
+        }
+    
     });
+
+    itemcards.controller('TableController', ['NgTableParams', function (NgTableParams) {
+        var self = this;
+
+        var initialParams = {
+            count: 10,
+            sorting: { regdate: "desc" }
+        };
+        var initialSettings = {
+            counts: [10, 25, 100],
+            paginationMaxBlocks: 12,
+            paginationMinBlocks: 5,
+            dataset: data
+        };
+
+        self.tableParams = new NgTableParams(initialParams, initialSettings);
+    }]);
 
     itemcards.directive("repeatEnd", function(){
         return {
@@ -309,7 +414,6 @@
 
     itemcards.filter("dateFilter", function($filter){
         return function(date) {
-            // console.log(date);
             var itemDateMin = $filter('date')(new Date(date), 'mm');
             var nowDateMin = $filter('date')(Date.now(), 'mm');
 
@@ -326,12 +430,38 @@
                 return minDiff + " 분 전";
             else if(secDiff)
                 return secDiff + " 초 전";
+            else
+                return "방금 전";
         }
     });
+    
+    itemcards.filter('callMap', function(){
+        return function(loc, scope) {
+            var map = 'https://www.google.com/maps/embed/v1/place?key='+scope.api_key+"&q="+loc+"&region=KR&language=ko";
+
+            return map;
+        }
+    });
+
+    itemcards.filter('trusted', ['$sce', function ($sce) {
+        return $sce.trustAsResourceUrl;
+    }]);
+</script>
+<script>
+    function maxLengthCheck(obj){
+        console.log("length: "+ obj.value.length);
+        console.log("maxLen: " + obj.maxLength);
+
+        if(obj.value.length > obj.maxLength)
+            obj.value = obj.value.slice(0, obj.maxLength);
+    }
+    
 </script>
 
 <body>
+    
 <div class="container" ng-app="ItemCards" ng-controller="ItemCardsCtrl">
+
     <div class="row">
         <nav class="z-depth-3">
             <div class="nav-wrapper">
@@ -383,11 +513,11 @@
                 </div>
               </div>
             <div class="row">
-                <div ng-repeat="item in items | filter:searchFilter | tabFilter:this | orderBy: tabFilterOrderProp : tabFilterOrderType" class='{{ item.status ? "" : "opacity" }}'>
+                <div ng-repeat="item in items | filter:searchFilter | tabFilter:this | orderBy: tabFilterOrderProp : tabFilterOrderType" class='{{ item.status ? "" : "opacity" }}' id="card_{{item._id}}">
                     <!-- <div ng-switch-when="on"> -->
                         <div class="col s12 m6 l4 xl4">
                             <a href="" class="black-text btn_read" ng-click="getItemData(item._id)">
-                            <div class="card hoverable z-depth-2 {{ item.buyer == logined_user ? 'green lighten-4' : '' }}">
+                            <div class="card hoverable z-depth-2 {{ item.buyer.name == logined_user ? 'green lighten-4' : '' }}">
                                 <div class="card-image" ng-switch="item.like_users.indexOf(logined_user)>-1?true:false">
                                     <img ng-src="{{ item.image[0].path | imgPathExp }}" class="img_thumb">
                                     <a class="btn-floating halfway-fab waves-effect waves-light lighten-1 grey" id="lk_{{item._id}}" ng-switch-when="false" value="{{item.like_users.indexOf(logined_user)>-1?true:false}}" ng-click="itemLike(item._id)"><i class="material-icons">favorite</i></a>
@@ -407,7 +537,7 @@
                                 <div class="card-action">
                                     <div class="row">
                                         <div class="col s12 center">
-                                            <div class="chip">
+                                            <div class="chip teal lighten-5">
                                                 <img img-check="{{item.username}}">
                                                 {{item.username}}
                                             </div>
@@ -448,9 +578,9 @@
           <i class="large material-icons">menu</i>
         </a>
         <ul>
-          <li><a href="http://google.com" class="btn-floating orange "><i class="material-icons">construction</i></a></li>
-          <li><a class="btn-floating green btn clr" href="#write" id="fab_write"><i class="material-icons">edit</i></a></li>
-          <li><a class="btn-floating blue btn clr" href="#login" id="fab_login"><i class="material-icons">person</i></a></li>
+          <li ng-if="is_admin"><a class="btn-floating orange btn clr" ng-click="btnAdminMenu()"><i class="material-icons">construction</i></a></li>
+          <li><a class="btn-floating green btn clr" id="fab_write"><i class="material-icons">edit</i></a></li>
+          <li><a class="btn-floating blue btn clr" id="fab_login"><i class="material-icons">person</i></a></li>
         </ul>
         <div class="tap-target" data-target="fab_login">
             <div class="tap-target-content">
@@ -497,16 +627,22 @@
                                   </div>
                             </div>
 
-                            <div class="input-field col s6">
+                            <div class="input-field col s4">
                                 <i class="material-icons prefix">sell</i>
                                 <input id="price" name="price" type="number" class="validate" required>
                                 <label for="price">판매가격</label>
                             </div>
                             
-                            <div class="input-field col s6">
+                            <div class="input-field col s4">
+                                <i class="material-icons prefix">location_on</i>
+                                <input id="location" name="location" type="text" class="validate" placeholder="거래장소" required ng-value="logined_loc">
+                                <label for="location" ></label>
+                            </div>
+
+                            <div class="input-field col s4">
                                 <div class="switch">
                                     <label>
-                                      판매완료
+                                      품절
                                       <input type="checkbox" checked id="upload_status">
                                       <span class="lever"></span>
                                       판매중
@@ -599,30 +735,34 @@
       <div id="register" class="modal ">
         <div class="modal-content z-depth-3 center">
             <div class="container ">
-                <form id="form_register">
+                <form id="form_register" name="form_register">
                     <div class="row">
                         <h1>회원가입</h1>
                         <div class="card-panel col s12">
                             <div class="input-field col s6">
                                 <i class="material-icons prefix">account_circle</i>
-                                <input id="username" name="username" type="text" class="validate" required>
-                                <label for="username">아이디</label>
+                                <input id="register_username" name="register_username" type="text" class="" required>
+                                <label for="register_username">아이디</label>
+                                <span class="helper-text" data-error="한글 영문 '_'만 가능해요" data-success="굿"></span>
                             </div>
                             <div class="input-field col s6">
                                 <i class="material-icons prefix">key</i>
-                                <input id="password_register" name="password" type="password" class="validate" required>
-                                <label for="password_register">비밀번호</label>
+                                <input id="register_password" name="register_password" type="password" class="validate" required>
+                                <label for="register_password">비밀번호</label>
+                                <span class="helper-text" data-error="비밀번호를 입력해주세요" data-success="굿"></span>
                             </div>
                             <div class="input-field col s6">
                                 <i class="material-icons prefix">phone_iphone</i>
-                                <input id="phone" name="phone" type="number" class="validate" required>
-                                <label for="phone">연락처</label>
+                                <input id="register_phone" name="register_phone" type="number" class="" maxlength="11" oninput="maxLengthCheck(this)" required>
+                                <label for="register_phone">연락처</label>
+                                <span class="helper-text" data-error="ex) 01012341234" data-success="굿"></span>
                             </div>
                             
                             <div class="input-field col s6">
                                 <i class="material-icons prefix">location_on</i>
-                                <input id="location" name="location" type="text" placeholder="ex) 서울 노원" class="validate" required>
-                                <label for="location">지역(시/군/구)</label>
+                                <input id="register_location" name="register_location" type="text" class="" required>
+                                <label for="register_location">지역(시/군/구)</label>
+                                <span class="helper-text" data-error="ex) 노원구, 송파구, 분당" data-success="굿"></span>
                             </div>
 
                             <div class="input-field col s1 valign-wrapper">
@@ -630,12 +770,12 @@
                             </div>
                             <div class="input-field file-field col s11">
                                   <div class="file-path-wrapper">
-                                    <input type="file" name="pfp" accept="image/*">
+                                    <input type="file" name="register_pfp" accept="image/*">
                                     <input class="file-path validate" type="text" placeholder="프로필 사진 첨부">
                                   </div>
                             </div>
                             
-                            <button class="btn-large waves-effect waves-light cyan" type="button" id="btn_register_apply">
+                            <button class="btn-large waves-effect waves-light cyan disabled" type="button" id="btn_register_apply">
                                 가입
                                 <i class="material-icons right">send</i>
                             </button>
@@ -649,7 +789,7 @@
         </div>
       </div>
 
-      <div id="login" class="modal  bottom-sheet">
+      <div id="login" class="modal bottom-sheet">
         <div class="modal-content z-depth-3 center">
             <div class="container ">
                 <form method="post" id="form_login">
@@ -669,12 +809,12 @@
                                     <label for="login_password">비밀번호</label>
                                 </div>
                                 <div class="col s6">
-                                    <button class="btn-large waves-effect waves-light clr cyan" type="button" name="action" id="btn_register">회원가입
+                                    <button class="btn-large waves-effect waves-light clr cyan" type="button" id="btn_register">회원가입
                                         <i class="material-icons right">person_add</i>
                                     </button>
                                 </div>
                                 <div class="col s6">
-                                    <button class="btn-large waves-effect waves-light " type="button" name="action" id="btn_login">로그인
+                                    <button class="btn-large waves-effect waves-light " type="button" id="btn_login">로그인
                                         <i class="material-icons right">login</i>
                                     </button>
                                 </div>
@@ -690,9 +830,20 @@
                                         {{logined_user}}
                                     </div>
                                 </div>
-                                <button class="btn-large waves-effect waves-light clr grey" type="button" name="action" id="btn_logout">로그아웃
-                                    <i class="material-icons right">logout</i>
-                                </button>
+
+                                <div class="col s12">
+                                    <iframe
+                                        height="200"
+                                        style="border:0"
+                                        allowfullscreen
+                                        src='{{logined_loc | callMap:this | trusted}}'>
+                                    </iframe>
+                                </div>
+                                <div class="col s12">
+                                    <button class="btn-large waves-effect waves-light clr grey" type="button" name="action" id="btn_logout">로그아웃
+                                        <i class="material-icons right">logout</i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -747,9 +898,23 @@
                                     <h5><i class="material-icons">tag</i>태그</h5>
                                 </div>
                                 <div class="collapsible-body">
-                                    <div class="chip" ng-repeat="tag in readItem.tag">
+                                    <div class="chip adjust-text" ng-repeat="tag in readItem.tag">
                                         {{tag.tag}}
                                     </div>
+                                </div>
+                            </li>
+                            <li class="active">
+                                <div class="collapsible-header deep-orange lighten-5">
+                                    <h5><i class="material-icons">location_on</i>지역</h5>
+                                </div>
+                                <div class="collapsible-body">
+                                    <iframe
+                                        height="300"
+                                        style="border:0"
+                                        loading="lazy"
+                                        allowfullscreen
+                                        src='{{readItem.location | callMap:this | trusted}}'>
+                                    </iframe>
                                 </div>
                             </li>
                             <li ng-show="readItem.status">
@@ -766,10 +931,36 @@
                                     <h5><i class="material-icons">thumb_up</i>{{readItem.status ? '거래중..' : '판매완료'}}</h5>
                                   </div>
                                 <div class="collapsible-body">
-                                    <div ng-show="readItem.buyer.name == logined_user || readItem.username == logined_user">
+                                    <div class="card" ng-show="readItem.review==null && !readItem.status && readItem.buyer.name==logined_user">
+                                        <form class="card-content row" id="form_review">
+                                            <div class="input-field col s12">
+                                                <i class="material-icons prefix">subtitles</i>
+                                                <textarea id="review_content" name="review_content" class="materialize-textarea validate" required></textarea>
+                                                <label for="review_content">후기를 작성해주세요</label>
+                                            </div>
+                                            <div class="input-field col s1">
+                                                <i class="material-icons left">star</i>
+                                            </div>
+                                            <div class="input-field col s11">
+                                                <input name="review_rate" type="range" min="0" max="5" step="0.1">
+                                            </div>
+                                            <button class="btn-large waves-effect waves-light brown" type="button" ng-click="itemReview(readItem._id)">상품 평가
+                                                <i class="material-icons right">rate_review</i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                    <div class="card" ng-show="readItem.review != null">
+                                        <div class="card-content row">
+                                            <span class="card-title"><i class="material-icons ">rate_review</i> 후기 한마디</span>
+                                            <h5>" <span class="green-text"> {{readItem.review.content}}</span> "</h5>
+                                        </div>
+                                        <div class="card-action">
+                                            <p><h5>평점 <span class="green-text">{{readItem.review.rate}}</span> / 5.0</h5></p>
+                                        </div>
+                                    </div>
+                                    <div ng-show="readItem.buyer.name == logined_user || readItem.username == logined_user || is_admin">
                                         <div class="chip adjust-text">
-                                            <!-- <img ng-init="getImg(readItem.buyer.name, readItem._id)" id="img_{{readItem._id}}"> -->
-                                            <img img-check="{{readItem.buyer.name}}">
+                                            <img ng-src="upload-images/{{name}}/pfp" ng-repeat="name in readItem.buyer" repeat-end="onEnd(true)" ng-if="name == readItem.buyer.name">
                                             {{readItem.buyer.name}}
                                         </div>
                                         <div class="chip adjust-text">
@@ -793,7 +984,7 @@
                             </li>
                         </ul>
                                     
-                        <div ng-if="readItem.username == logined_user">
+                        <div ng-if="readItem.username == logined_user || is_admin">
 
                             <div class="col s6">
                                 <button class="btn-large waves-effect waves-light red" type="button" ng-click="itemDelete(readItem._id)">삭제
@@ -817,6 +1008,27 @@
             </div>
         </div>
       </div>
+      
+    <div id="adminMenu" class="modal">
+        <div class="card-panel grey lighten-5 z-depth-3 center" ng-if="is_admin">
+            <div ng-controller="TableController as vm">
+                <table ng-table="vm.tableParams" class="striped highlight responsive-table" show-filter="true">
+                    <tr ng-repeat="user in $data" id="tr_{{user._id}}" class="{{user.admin?'green lighten-3':''}}">
+                        <td data-title="'아이디'" filter="{ username: 'text'}", sortable="'username'">
+                            {{user.username}}</td>
+                        <td data-title="'연락처'" filter="{ phone: 'number'}" sortable="'phone'">
+                            {{user.phone | phoneExp}}</td>
+                        <td data-title="'등록주소'" filter="{ location: 'text'}" sortable="'location'">
+                            {{user.location}}</td>
+                        <td data-title="'가입시간'" filter="{ regdate: 'text' }" sortable="'regdate'">
+                            {{user.regdate | date:'yyyy/MM/dd HH:mm:ss'}}</td>
+                        <td data-title="'삭제'">
+                            <button class="btn-flat" ng-click="userDelete(user._id)" ng-disabled="user.admin"><i class="material-icons">delete</i></button></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
 </body>
 
@@ -832,7 +1044,67 @@
         $('.tap-target').tapTarget();
         $('.modal').modal();
         $('.tabs').tabs();
+        $('textarea').characterCounter();
+        M.updateTextFields();
         // M.AutoInit();
+
+        const regID = /^[a-zA-Z0-9가-힇_]{2,16}$/;
+        const regPH = /^\d{11}$/;
+        const regLO = /^[가-힇 ]{1,20}$/;
+
+        var val_id;
+        var val_ph;
+        var val_lo;
+
+        document.getElementById("register_username").addEventListener("keyup", checkID);
+        document.getElementById("register_phone").addEventListener("keyup", checkPH);
+        document.getElementById("register_location").addEventListener("keyup", checkLO);
+
+        function checkPH() {
+            val_ph = document.getElementById("register_phone").value;
+
+            if(regPH.test(val_ph)) {
+                document.getElementById("register_phone").classList.remove("invalid");
+                document.getElementById("register_phone").classList.add("valid");
+            } else {
+                document.getElementById("register_phone").classList.remove("valid");
+                document.getElementById("register_phone").classList.add("invalid");
+            }
+
+            if(regID.test(val_id) && regPH.test(val_ph) && regLO.test(val_lo))
+                document.getElementById("btn_register_apply").classList.remove("disabled");
+            else  document.getElementById("btn_register_apply").classList.add("disabled");
+        }
+        function checkLO() {
+            val_lo = document.getElementById("register_location").value;
+
+            if(regLO.test(val_lo)) {
+                document.getElementById("register_location").classList.remove("invalid");
+                document.getElementById("register_location").classList.add("valid");
+            } else {
+                document.getElementById("register_location").classList.remove("valid");
+                document.getElementById("register_location").classList.add("invalid");
+            }
+
+            if(regID.test(val_id) && regPH.test(val_ph) && regLO.test(val_lo))
+                document.getElementById("btn_register_apply").classList.remove("disabled");
+            else  document.getElementById("btn_register_apply").classList.add("disabled");
+        }
+        function checkID() {
+            val_id = document.getElementById("register_username").value;
+
+            if(regID.test(val_id)) {
+                document.getElementById("register_username").classList.remove("invalid");
+                document.getElementById("register_username").classList.add("valid");
+            } else {
+                document.getElementById("register_username").classList.remove("valid");
+                document.getElementById("register_username").classList.add("invalid");
+            }
+
+            if(regID.test(val_id) && regPH.test(val_ph) && regLO.test(val_lo))
+                document.getElementById("btn_register_apply").classList.remove("disabled");
+            else  document.getElementById("btn_register_apply").classList.add("disabled");
+        }
 
         $('.clr').click(function(event){
             $('form').each(function(){this.reset();});
@@ -860,12 +1132,11 @@
                 url: '/write',
                 data : formData,
                 success: function(res){
-                    console.log(res);
                     location.replace('/');
                 },
                 error: function(req, status, err){
                     M.toast({html: '매물 등록 오류, 로그 확인'});
-                    console.log(err);
+                    console.error('err', err);
                 }
             });
         });
@@ -875,10 +1146,7 @@
         });
 
         $('#btn_register_apply').click(function(event){
-            // var form_Data = $('#form_register').serialize();
-            // console.log(form_Data);
             var formData = new FormData($('#form_register')[0]);
-            console.log(formData);
 
             $.ajax({
                 type: "POST",
@@ -901,13 +1169,14 @@
                 },
                 error: function(req, status, err){
                     M.toast({html: '회원가입 오류, 로그 확인'});
-                    console.log(err);
+                    console.error('err', err);
                 }
             });
         });
 
         $('#btn_login').click(function(event){
             var formData = $('#form_login').serialize();
+
 
             $.post('/login', formData, function(res){
                 if(!res){
@@ -920,7 +1189,7 @@
                 }
             }).fail(function(res){
                 M.toast({html: '로그인 오류, 로그 확인'});
-                console.log(res);
+                console.error('err', res);
             });
         });
 
